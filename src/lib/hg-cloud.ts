@@ -48,7 +48,14 @@ export function createHgCloud(onSignOut: () => void) {
         password,
         options: { data: { name, celular }, emailRedirectTo: window.location.origin + "/app" },
       });
-      if (error) throw error;
+      if (error) {
+        const m = error.message;
+        if (/weak|easy to guess|pwned/i.test(m)) throw new Error("Essa senha é muito comum. Escolha uma senha mais forte.");
+        if (/not allowed|invalid/i.test(m) && /email/i.test(m)) throw new Error("Esse e-mail não é válido.");
+        if (/already registered/i.test(m)) throw new Error("E-mail já cadastrado.");
+        if (/rate limit/i.test(m)) throw new Error("Muitas tentativas. Aguarde alguns minutos.");
+        throw error;
+      }
     },
     async resetPassword(email: string) {
       const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + "/reset-password" });
