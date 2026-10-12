@@ -92,7 +92,7 @@ body{font-family:Inter,sans-serif;background:#0f172a;color:#f8fafc;margin:0}
 </head>
 <body>
 
-<div id="login" style="display:none">
+<div id="login">
 <div class="lc">
 <div class="lg"><i class="fa-solid fa-chart-pie"></i><h1>HiperGestão</h1></div>
 
@@ -110,7 +110,7 @@ body{font-family:Inter,sans-serif;background:#0f172a;color:#f8fafc;margin:0}
 <div class="ig"><label>Nome de usuário *</label><input type="text" id="su" placeholder="Escolha um nome"></div>
 <div class="ig"><label>E-mail *</label><input type="email" id="se" placeholder="seu@email.com" autocomplete="email"></div>
 <div class="ig"><label>Celular *</label><input type="tel" id="sc" placeholder="(11) 99999-9999"></div>
-<div class="ig"><label>Senha *</label><input type="password" id="sp" placeholder="Mínimo 4 caracteres"></div>
+<div class="ig"><label>Senha *</label><input type="password" id="sp" placeholder="Mínimo 6 caracteres"></div>
 <div class="ig"><label>Confirmar senha *</label><input type="password" id="sp2" placeholder="Digite novamente"></div>
 <button class="bp" onclick="doSignup()"><i class="fa-solid fa-user-plus" style="margin-right:.5rem"></i>Cadastrar</button>
 <div id="se2" class="er"></div>
@@ -120,11 +120,11 @@ body{font-family:Inter,sans-serif;background:#0f172a;color:#f8fafc;margin:0}
 
 <div id="pReset" class="hidden">
 <h3 style="color:#fff;font-weight:700;font-size:1.1rem;margin:0 0 .5rem">Recuperar senha</h3>
-<p style="color:#94a3b8;font-size:.8rem;margin:0 0 1rem">Informe o e-mail cadastrado e defina uma nova senha.</p>
+<p style="color:#94a3b8;font-size:.8rem;margin:0 0 1rem">Informe o e-mail cadastrado. Enviaremos um link para criar uma nova senha.</p>
 <div class="ig"><label>E-mail cadastrado *</label><input type="email" id="re" placeholder="seu@email.com" autocomplete="email"></div>
-<div class="ig"><label>Nova senha *</label><input type="password" id="rp" placeholder="Mínimo 4 caracteres"></div>
-<div class="ig"><label>Confirmar nova senha *</label><input type="password" id="rp2" placeholder="Digite novamente"></div>
-<button class="bp" onclick="doReset()"><i class="fa-solid fa-key" style="margin-right:.5rem"></i>Redefinir</button>
+<div class="ig" style="display:none"><label>Nova senha *</label><input type="password" id="rp" placeholder="Mínimo 6 caracteres"></div>
+<div class="ig" style="display:none"><label>Confirmar nova senha *</label><input type="password" id="rp2" placeholder="Digite novamente"></div>
+<button class="bp" onclick="doReset()"><i class="fa-solid fa-key" style="margin-right:.5rem"></i>Enviar link</button>
 <div id="re2" class="er"></div>
 <div id="rok" class="ok"></div>
 <div class="pl c"><a onclick="showPanel('login')">← Voltar</a></div>
@@ -489,25 +489,14 @@ function sRem(k){delete mem[k];try{localStorage.removeItem(k)}catch(e){}}
 function sClr(){for(const k in mem)delete mem[k];try{localStorage.clear()}catch(e){}try{sessionStorage.clear()}catch(e){}}
 
 // ============ USUÁRIOS ============
-function getUsers(){
-  let raw=sGet('hg_users');let u=null;
-  if(raw){try{u=JSON.parse(raw)}catch(e){u=null}}
-  if(!u||!Array.isArray(u)||u.length===0){
-    u=[{id:1,username:'admin',password:'admin123',role:'admin',active:true,email:'admin@hg.com',celular:'11999999999'}];
-    sSet('hg_users',JSON.stringify(u));
-  }
-  if(!u.some(x=>x&&x.username==='admin')){
-    u.unshift({id:1,username:'admin',password:'admin123',role:'admin',active:true,email:'admin@hg.com',celular:'11999999999'});
-    sSet('hg_users',JSON.stringify(u));
-  }
-  return u;
-}
+let cloudUsers=[];
+function getUsers(){return me&&isAdm()?cloudUsers:(me?[me]:[])}
 function saveUsers(u){sSet('hg_users',JSON.stringify(u))}
 let me=null;
 function getMe(){const d=sGet('hg_me');if(d){try{return JSON.parse(d)}catch(e){}}return null}
 function setMe(u){if(u)sSet('hg_me',JSON.stringify(u));else sRem('hg_me');me=u}
 function isAdm(){return me&&me.role==='admin'}
-function resetAll(){if(!confirm('⚠️ APAGAR TODOS os dados?'))return;sClr();location.reload()}
+function resetAll(){if(!confirm('Limpar os dados temporários deste navegador? Seus dados na nuvem continuam salvos.'))return;sClr();location.reload()}
 
 // ============ LOGIN (AGORA COM E-MAIL) ============
 function showPanel(p){
@@ -516,66 +505,38 @@ function showPanel(p){
   document.getElementById('pReset').classList.toggle('hidden',p!=='reset');
   ['le','se2','sok','re2','rok'].forEach(id=>{const e=document.getElementById(id);if(e){e.style.display='none';e.textContent=''}});
 }
-function doLogin(){
+function showErr(id,t){const e=document.getElementById(id);e.textContent=t;e.style.display='block'}
+async function doLogin(){
   const em=document.getElementById('lu').value.trim().toLowerCase();
-  const p=document.getElementById('lp').value.trim();
-  const e=document.getElementById('le');
-  e.style.display='none';e.textContent='';
-  if(!em||!p){e.textContent='Preencha e-mail e senha';e.style.display='block';return}
-  if(!em.includes('@')){e.textContent='Digite um e-mail válido';e.style.display='block';return}
-  const users=getUsers();
-  const f=users.find(x=>(x.email||'').toLowerCase()===em&&x.password===p);
-  if(!f){e.textContent='❌ E-mail ou senha inválidos';e.style.display='block';return}
-  if(!f.active){e.textContent='❌ Usuário bloqueado. Contate o administrador.';e.style.display='block';return}
-  setMe({id:f.id,username:f.username,email:f.email,role:f.role});
-  document.getElementById('login').style.display='none';
-  document.getElementById('app').style.display='flex';
-  document.getElementById('ub').textContent=f.username;
-  document.getElementById('la').style.display=f.role==='admin'?'inline-flex':'none';
-  initApp();
+  const p=document.getElementById('lp').value;
+  document.getElementById('le').style.display='none';
+  if(!em||!p)return showErr('le','Preencha e-mail e senha');
+  if(!em.includes('@'))return showErr('le','Digite um e-mail válido');
+  try{await cloud.signIn(em,p);await startSession()}catch(err){showErr('le','❌ '+err.message)}
 }
-function doSignup(){
+async function doSignup(){
   const u=document.getElementById('su').value.trim();
   const em=document.getElementById('se').value.trim().toLowerCase();
   const c=document.getElementById('sc').value.trim();
   const p=document.getElementById('sp').value;
   const p2=document.getElementById('sp2').value;
-  const e=document.getElementById('se2');
-  const ok=document.getElementById('sok');
-  e.style.display='none';ok.style.display='none';
-  if(!u||!em||!c||!p||!p2){e.textContent='Preencha todos os campos';e.style.display='block';return}
-  if(!em.includes('@')){e.textContent='Digite um e-mail válido';e.style.display='block';return}
-  if(p.length<4){e.textContent='Senha mínimo 4 caracteres';e.style.display='block';return}
-  if(p!==p2){e.textContent='Senhas não coincidem';e.style.display='block';return}
-  const users=getUsers();
-  if(users.find(x=>x.username===u)){e.textContent='Nome de usuário já existe';e.style.display='block';return}
-  if(users.find(x=>(x.email||'').toLowerCase()===em)){e.textContent='E-mail já cadastrado';e.style.display='block';return}
-  const id=Math.max(...users.map(x=>x.id))+1;
-  users.push({id,username:u,password:p,role:'user',active:true,email:em,celular:c});
-  saveUsers(users);
-  ok.textContent='✅ Conta criada! Faça login com seu e-mail.';ok.style.display='block';
-  ['su','se','sc','sp','sp2'].forEach(x=>document.getElementById(x).value='');
-  setTimeout(()=>{showPanel('login');document.getElementById('lu').value=em},1500);
+  document.getElementById('se2').style.display='none';document.getElementById('sok').style.display='none';
+  if(!u||!em||!c||!p||!p2)return showErr('se2','Preencha todos os campos');
+  if(!em.includes('@'))return showErr('se2','Digite um e-mail válido');
+  if(p.length<6)return showErr('se2','Senha mínimo 6 caracteres');
+  if(p!==p2)return showErr('se2','Senhas não coincidem');
+  try{
+    await cloud.signUp(u,em,c,p);
+    const ok=document.getElementById('sok');ok.textContent='✅ Conta criada! Confirme pelo link enviado ao seu e-mail e depois faça login.';ok.style.display='block';
+    ['su','se','sc','sp','sp2'].forEach(x=>document.getElementById(x).value='');
+    setTimeout(()=>{showPanel('login');document.getElementById('lu').value=em},2500);
+  }catch(err){showErr('se2','❌ '+err.message)}
 }
-// RECUPERAÇÃO AGORA SÓ COM E-MAIL
-function doReset(){
+async function doReset(){
   const em=document.getElementById('re').value.trim().toLowerCase();
-  const p=document.getElementById('rp').value;
-  const p2=document.getElementById('rp2').value;
-  const e=document.getElementById('re2');
-  const ok=document.getElementById('rok');
-  e.style.display='none';ok.style.display='none';
-  if(!em||!p||!p2){e.textContent='Preencha todos os campos';e.style.display='block';return}
-  if(!em.includes('@')){e.textContent='Digite um e-mail válido';e.style.display='block';return}
-  if(p.length<4){e.textContent='Senha mínimo 4 caracteres';e.style.display='block';return}
-  if(p!==p2){e.textContent='Senhas não coincidem';e.style.display='block';return}
-  const users=getUsers();
-  const user=users.find(x=>(x.email||'').toLowerCase()===em);
-  if(!user){e.textContent='E-mail não cadastrado';e.style.display='block';return}
-  if(!user.active){e.textContent='Usuário bloqueado. Contate o administrador.';e.style.display='block';return}
-  user.password=p;saveUsers(users);
-  ok.textContent='✅ Senha redefinida! Faça login.';ok.style.display='block';
-  setTimeout(()=>{showPanel('login');document.getElementById('lu').value=em},1500);
+  document.getElementById('re2').style.display='none';document.getElementById('rok').style.display='none';
+  if(!em||!em.includes('@'))return showErr('re2','Digite um e-mail válido');
+  try{await cloud.resetPassword(em);const ok=document.getElementById('rok');ok.textContent='✅ Enviamos um link para você criar uma nova senha.';ok.style.display='block'}catch(err){showErr('re2','❌ '+err.message)}
 }
 function doLogout(){if(confirm('Deseja sair?')){if(cloud)cloud.signOut()}}
 
@@ -588,7 +549,7 @@ const defCats={
   despesa:{'Moradia':['Condomínio','IPTU','Aluguel','Energia','Gás','Água','Internet'],'Comunicação':['Celular','TV','Apps'],'Alimentação':['Supermercado','Restaurante','Padaria'],'Transporte':['Combustível','Uber','Manutenção','IPVA'],'Saúde':['Plano','Farmácia','Consultas'],'Pessoais':['Vestuário','Higiene','Estética','Academia'],'Educação':['Colégio','Cursos'],'Lazer':['Streaming','Cinema','Viagens'],'Serviços Financeiros':['Tarifas','Anuidade'],'Empresa':['Contabilidade','MEI'],'Dependentes':['Educação','Mesada'],'Diversos':['Presentes','Doações'],'Empréstimo':['Parcelamento'],'Investimentos':['Reserva'],'Pagamento de Fatura':['Fatura'],'Envio Transf':['Envio'],'Ajuste':['Ajuste'],'Anúncios':['Google ADS']}
 };
 
-const cloud=window.parent&&window.parent.hgCloud;
+let cloud=null;
 let cloudData=null;
 function load(){
   const d=cloudData||{};
@@ -796,7 +757,7 @@ function renderUsers(){
   let h='<table style="width:100%;text-align:left;font-size:.875rem"><thead><tr style="color:#94a3b8;font-size:.75rem;text-transform:uppercase;border-bottom:1px solid #1e293b"><th style="padding:.5rem .75rem">ID</th><th style="padding:.5rem .75rem">Usuário</th><th style="padding:.5rem .75rem">E-mail</th><th style="padding:.5rem .75rem">Função</th><th style="padding:.5rem .75rem">Status</th><th style="padding:.5rem .75rem;text-align:center">Ações</th></tr></thead><tbody>';
   users.forEach(u=>{
     const self=u.id===me.id;
-    h+=`<tr style="border-bottom:1px solid #1e293b;color:#cbd5e1"><td style="padding:.5rem .75rem">${u.id}</td><td style="padding:.5rem .75rem">${u.username}</td><td style="padding:.5rem .75rem">${u.email||'—'}</td><td style="padding:.5rem .75rem">${u.role}</td><td style="padding:.5rem .75rem;color:${u.active?'#34d399':'#fb7185'}">${u.active?'Ativo':'Bloqueado'}</td><td style="padding:.5rem .75rem;text-align:center">${!self?`<button onclick="toggleUser(${u.id})" style="font-size:.75rem;color:#60a5fa;background:0;border:0;cursor:pointer;margin-right:.5rem">${u.active?'Bloquear':'Reativar'}</button><button onclick="openResetPass(${u.id})" style="font-size:.75rem;color:#fbbf24;background:0;border:0;cursor:pointer;margin-right:.5rem"><i class="fa-solid fa-key"></i></button><button onclick="delUser(${u.id})" style="font-size:.75rem;color:#fb7185;background:0;border:0;cursor:pointer">Excluir</button>`:'<span style="font-size:.75rem;color:#64748b">(você)</span>'}</td></tr>`;
+    h+=`<tr style="border-bottom:1px solid #1e293b;color:#cbd5e1"><td style="padding:.5rem .75rem">${u.id}</td><td style="padding:.5rem .75rem">${u.username}</td><td style="padding:.5rem .75rem">${u.email||'—'}</td><td style="padding:.5rem .75rem">${u.role}</td><td style="padding:.5rem .75rem;color:${u.active?'#34d399':'#fb7185'}">${u.active?'Ativo':'Bloqueado'}</td><td style="padding:.5rem .75rem;text-align:center">${!self?`<button onclick="toggleUser('${u.id}')" style="font-size:.75rem;color:#60a5fa;background:0;border:0;cursor:pointer;margin-right:.5rem">${u.active?'Bloquear':'Reativar'}</button><button onclick="openResetPass('${u.id}')" style="font-size:.75rem;color:#fbbf24;background:0;border:0;cursor:pointer;margin-right:.5rem"><i class="fa-solid fa-key"></i></button><button onclick="delUser('${u.id}')" style="font-size:.75rem;color:#fb7185;background:0;border:0;cursor:pointer">Excluir</button>`:'<span style="font-size:.75rem;color:#64748b">(você)</span>'}</td></tr>`;
   });
   h+='</tbody></table>';
   c.innerHTML=h;
@@ -1372,18 +1333,27 @@ function initApp(){
   upTtStyle();
 }
 
+// ============ ADMIN (nuvem) ============
+function adminCloudOnly(){alert('Contas agora são criadas pelo próprio usuário na tela de cadastro. Bloqueio, exclusão e troca de senha de outros usuários são feitos pelo painel do Lovable Cloud.')}
+addUser=adminCloudOnly;toggleUser=adminCloudOnly;delUser=adminCloudOnly;openResetPass=adminCloudOnly;
+
 // ============ START ============
+async function startSession(){
+  const u=await cloud.getUser();
+  if(!u){document.getElementById('login').style.display='';return}
+  cloudData=await cloud.load();
+  me=u;
+  if(u.role==='admin'){try{cloudUsers=await cloud.listUsers()}catch(e){cloudUsers=[u]}}
+  document.getElementById('login').style.display='none';
+  document.getElementById('app').style.display='flex';
+  document.getElementById('ub').textContent=u.username;
+  document.getElementById('la').style.display=u.role==='admin'?'inline-flex':'none';
+  initApp();
+}
 (async function(){
+  for(let i=0;i<100&&!cloud;i++){cloud=window.parent&&window.parent!==window&&window.parent.hgCloud;if(!cloud)await new Promise(r=>setTimeout(r,100))}
   if(!cloud){document.body.innerHTML='<p style="padding:2rem;font-family:sans-serif">Abra o app pela página principal.</p>';return}
-  try{
-    const u=await cloud.getUser();
-    cloudData=await cloud.load();
-    me=u;
-    document.getElementById('login').style.display='none';
-    document.getElementById('app').style.display='flex';
-    document.getElementById('ub').textContent=u.username;
-    initApp();
-  }catch(e){console.error(e);alert('Erro ao carregar seus dados: '+(e.message||e))}
+  try{await startSession()}catch(e){console.error(e);document.getElementById('login').style.display='';alert('Erro ao carregar seus dados: '+(e.message||e))}
 })();
 </script>
 </body>

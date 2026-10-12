@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { createHgCloud } from "@/lib/hg-cloud";
 
-export const Route = createFileRoute("/_authenticated/app")({
+export const Route = createFileRoute("/app")({
   head: () => ({
     meta: [
       { title: "Painel — HiperGestão" },
@@ -22,7 +22,7 @@ function AppPage() {
   if (typeof window !== "undefined") {
     (window as unknown as { hgCloud: unknown }).hgCloud = createHgCloud(() => {
       queryClient.clear();
-      navigate({ to: "/auth", replace: true });
+      window.location.reload();
     });
   }
   return (

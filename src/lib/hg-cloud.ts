@@ -24,10 +24,39 @@ let queue: Promise<void> = Promise.resolve();
 export function createHgCloud(onSignOut: () => void) {
   return {
     async getUser() {
-      const userId = await uid();
-      const { data } = await supabase.from("profiles").select("name,email").eq("id", userId).maybeSingle();
       const { data: u } = await supabase.auth.getUser();
-      return { id: userId, username: data?.name || u.user?.email || "", email: u.user?.email || "", role: "user" };
+      if (!u.user) return null;
+      const userId = u.user.id;
+      const { data } = await supabase.from("profiles").select("name,email,celular").eq("id", userId).maybeSingle();
+      const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" });
+      return {
+        id: userId,
+        username: data?.name || u.user.email || "",
+        email: u.user.email || "",
+        celular: data?.celular || "",
+        role: isAdmin ? "admin" : "user",
+        active: true,
+      };
+    },
+    async signIn(email: string, password: string) {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw new Error(error.message === "Invalid login credentials" ? "E-mail ou senha inválidos" : error.message === "Email not confirmed" ? "Confirme seu e-mail pelo link enviado antes de entrar" : error.message);
+    },
+    async signUp(name: string, email: string, celular: string, password: string) {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { name, celular }, emailRedirectTo: window.location.origin + "/app" },
+      });
+      if (error) throw error;
+    },
+    async resetPassword(email: string) {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + "/reset-password" });
+      if (error) throw error;
+    },
+    async listUsers() {
+      const { data } = await supabase.from("profiles").select("id,name,email,celular").order("created_at");
+      return (data ?? []).map((p) => ({ id: p.id, username: p.name || p.email, email: p.email, celular: p.celular, role: "user", active: true }));
     },
     async load() {
       const out: Record<string, unknown> = {};
