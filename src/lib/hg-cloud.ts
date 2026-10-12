@@ -39,7 +39,7 @@ export function createHgCloud(onSignOut: () => void) {
         out[k] = rows;
       }
       const { data: c } = await supabase.from("user_categories").select("data").maybeSingle();
-      out.cats = c?.data ?? null;
+      out["cats"] = c?.data ?? null;
       syncedCats = c ? JSON.stringify(c.data) : "";
       return out;
     },
@@ -65,11 +65,11 @@ export function createHgCloud(onSignOut: () => void) {
           }
           synced[k] = next;
         }
-        const cats = JSON.stringify(snapshot.cats ?? null);
-        if (snapshot.cats && cats !== syncedCats) {
+        const cats = JSON.stringify(snapshot["cats"] ?? null);
+        if (snapshot["cats"] && cats !== syncedCats) {
           const { error } = await supabase
             .from("user_categories")
-            .upsert({ user_id: userId, data: snapshot.cats, updated_at: new Date().toISOString() });
+            .upsert({ user_id: userId, data: snapshot["cats"], updated_at: new Date().toISOString() });
           if (error) throw error;
           syncedCats = cats;
         }
