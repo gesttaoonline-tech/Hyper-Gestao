@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -8,18 +8,10 @@ export const Route = createFileRoute("/")({
       { property: "og:title", content: "HiperGestão" },
       { property: "og:description", content: "HiperGestão — gestão financeira pessoal." },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
-  component: Index,
+  beforeLoad: () => {
+    throw redirect({ to: "/app" });
+  },
 });
-
-function Index() {
-  return (
-    <iframe
-      src="/hipergestao.html"
-      title="HiperGestão"
-      className="fixed inset-0 h-screen w-screen border-0"
-    />
-  );
-}
