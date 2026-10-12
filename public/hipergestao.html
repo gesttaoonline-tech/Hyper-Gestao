@@ -92,7 +92,7 @@ body{font-family:Inter,sans-serif;background:#0f172a;color:#f8fafc;margin:0}
 </head>
 <body>
 
-<div id="login">
+<div id="login" style="display:none">
 <div class="lc">
 <div class="lg"><i class="fa-solid fa-chart-pie"></i><h1>HiperGestão</h1></div>
 
@@ -577,7 +577,7 @@ function doReset(){
   ok.textContent='✅ Senha redefinida! Faça login.';ok.style.display='block';
   setTimeout(()=>{showPanel('login');document.getElementById('lu').value=em},1500);
 }
-function doLogout(){if(confirm('Deseja sair?')){setMe(null);location.reload()}}
+function doLogout(){if(confirm('Deseja sair?')){if(cloud)cloud.signOut()}}
 
 // ============ DADOS ============
 let txs=[],cards=[],buds=[],recs=[],fats=[],cats={};
@@ -588,27 +588,20 @@ const defCats={
   despesa:{'Moradia':['Condomínio','IPTU','Aluguel','Energia','Gás','Água','Internet'],'Comunicação':['Celular','TV','Apps'],'Alimentação':['Supermercado','Restaurante','Padaria'],'Transporte':['Combustível','Uber','Manutenção','IPVA'],'Saúde':['Plano','Farmácia','Consultas'],'Pessoais':['Vestuário','Higiene','Estética','Academia'],'Educação':['Colégio','Cursos'],'Lazer':['Streaming','Cinema','Viagens'],'Serviços Financeiros':['Tarifas','Anuidade'],'Empresa':['Contabilidade','MEI'],'Dependentes':['Educação','Mesada'],'Diversos':['Presentes','Doações'],'Empréstimo':['Parcelamento'],'Investimentos':['Reserva'],'Pagamento de Fatura':['Fatura'],'Envio Transf':['Envio'],'Ajuste':['Ajuste'],'Anúncios':['Google ADS']}
 };
 
+const cloud=window.parent&&window.parent.hgCloud;
+let cloudData=null;
 function load(){
-  try{txs=JSON.parse(sGet('hg_txs')||'[]')}catch(e){txs=[]}
-  try{cards=JSON.parse(sGet('hg_cards')||'[]')}catch(e){cards=[]}
-  try{buds=JSON.parse(sGet('hg_buds')||'[]')}catch(e){buds=[]}
-  try{recs=JSON.parse(sGet('hg_recs')||'[]')}catch(e){recs=[]}
-  try{fats=JSON.parse(sGet('hg_fats')||'[]')}catch(e){fats=[]}
-  try{cats=JSON.parse(sGet('hg_cats')||'null')}catch(e){cats=null}
-  if(!Array.isArray(txs))txs=[];
-  if(!Array.isArray(cards))cards=[];
-  if(!Array.isArray(buds))buds=[];
-  if(!Array.isArray(recs))recs=[];
-  if(!Array.isArray(fats))fats=[];
-  if(!cats||!cats.receita||!cats.despesa){cats=JSON.parse(JSON.stringify(defCats));sSet('hg_cats',JSON.stringify(cats))}
+  const d=cloudData||{};
+  txs=Array.isArray(d.txs)?d.txs:[];
+  cards=Array.isArray(d.cards)?d.cards:[];
+  buds=Array.isArray(d.buds)?d.buds:[];
+  recs=Array.isArray(d.recs)?d.recs:[];
+  fats=Array.isArray(d.fats)?d.fats:[];
+  cats=d.cats;
+  if(!cats||!cats.receita||!cats.despesa){cats=JSON.parse(JSON.stringify(defCats));save()}
 }
 function save(){
-  sSet('hg_txs',JSON.stringify(txs));
-  sSet('hg_cards',JSON.stringify(cards));
-  sSet('hg_buds',JSON.stringify(buds));
-  sSet('hg_recs',JSON.stringify(recs));
-  sSet('hg_fats',JSON.stringify(fats));
-  sSet('hg_cats',JSON.stringify(cats));
+  if(cloud)return cloud.save({txs,cards,buds,recs,fats,cats});
 }
 
 function fmt(v){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v||0)}
@@ -1171,35 +1164,25 @@ function saveRec(){
 }
 
 // ============ PERFIL ============
-function renderProfile(){const u=getUsers().find(x=>x.id===me.id);if(!u)return;document.getElementById('pce').value=u.email||''}
-function changeEmail(){
+function renderProfile(){document.getElementById('pce').value=me.email||''}
+async function changeEmail(){
   const e=document.getElementById('pne').value.trim().toLowerCase();
-  if(!e){alert('Digite o e-mail');return}
-  if(!e.includes('@')){alert('Digite um e-mail válido');return}
-  const users=getUsers();
-  const u=users.find(x=>x.id===me.id);
-  if(users.find(x=>(x.email||'').toLowerCase()===e&&x.id!==u.id)){alert('E-mail já cadastrado');return}
-  u.email=e;saveUsers(users);renderProfile();alert('✅ E-mail atualizado!');
+  if(!e||!e.includes('@')){alert('Digite um e-mail válido');return}
+  try{await cloud.updateEmail(e);alert('✅ Enviamos um link de confirmação para o novo e-mail.')}catch(err){alert('❌ '+err.message)}
 }
-function changePass(){
+async function changePass(){
   const c=document.getElementById('pcp').value;
   const n=document.getElementById('pnp').value;
   const cf=document.getElementById('pcpf').value;
-  if(n.length<4){alert('Senha mínimo 4 caracteres');return}
+  if(n.length<6){alert('Senha mínimo 6 caracteres');return}
   if(n!==cf){alert('Senhas não coincidem');return}
-  const users=getUsers();
-  const u=users.find(x=>x.id===me.id);
-  if(u.password!==c){alert('Senha atual incorreta');return}
-  u.password=n;saveUsers(users);alert('✅ Senha alterada!');
-  ['pcp','pnp','pcpf'].forEach(x=>document.getElementById(x).value='');
+  try{await cloud.updatePassword(c,n);alert('✅ Senha alterada!');['pcp','pnp','pcpf'].forEach(x=>document.getElementById(x).value='')}catch(err){alert('❌ '+err.message)}
 }
-function delAccount(){
-  if(!confirm('Excluir sua conta permanentemente?'))return;
+async function delAccount(){
+  if(!confirm('Apagar todos os seus dados e sair?'))return;
   if(!confirm('Tem certeza?'))return;
-  txs=txs.filter(t=>t.userId!==me.id);
-  save();
-  saveUsers(getUsers().filter(u=>u.id!==me.id));
-  setMe(null);location.reload();
+  txs=[];cards=[];buds=[];recs=[];fats=[];
+  await save();cloud.signOut();
 }
 
 // ============ ADMIN ============
@@ -1390,17 +1373,17 @@ function initApp(){
 }
 
 // ============ START ============
-(function(){
-  getUsers();
-  const u=getMe();
-  if(u){
+(async function(){
+  if(!cloud){document.body.innerHTML='<p style="padding:2rem;font-family:sans-serif">Abra o app pela página principal.</p>';return}
+  try{
+    const u=await cloud.getUser();
+    cloudData=await cloud.load();
     me=u;
     document.getElementById('login').style.display='none';
     document.getElementById('app').style.display='flex';
     document.getElementById('ub').textContent=u.username;
-    if(u.role==='admin')document.getElementById('la').style.display='inline-flex';
     initApp();
-  }
+  }catch(e){console.error(e);alert('Erro ao carregar seus dados: '+(e.message||e))}
 })();
 </script>
 </body>
