@@ -1333,6 +1333,10 @@ function initApp(){
   upTtStyle();
 }
 
+// ============ ADMIN (nuvem) ============
+function adminCloudOnly(){alert('Contas agora são criadas pelo próprio usuário na tela de cadastro. Bloqueio, exclusão e troca de senha de outros usuários são feitos pelo painel do Lovable Cloud.')}
+addUser=adminCloudOnly;toggleUser=adminCloudOnly;delUser=adminCloudOnly;openResetPass=adminCloudOnly;
+
 // ============ START ============
 async function startSession(){
   const u=await cloud.getUser();

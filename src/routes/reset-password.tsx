@@ -1,4 +1,3 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -17,7 +16,6 @@ export const Route = createFileRoute("/reset-password")({
 });
 
 function ResetPassword() {
-  const navigate = useNavigate();
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState("");
 
@@ -26,7 +24,7 @@ function ResetPassword() {
     if (password.length < 6) return setMsg("A senha precisa ter pelo menos 6 caracteres.");
     const { error } = await supabase.auth.updateUser({ password });
     if (error) return setMsg(error.message);
-    navigate({ to: "/app" });
+    window.location.href = "/app";
   }
 
   return (
