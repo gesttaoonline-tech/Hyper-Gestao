@@ -63,7 +63,9 @@ export function createHgCloud(onSignOut: () => void) {
     },
     async listUsers() {
       const { data } = await supabase.from("profiles").select("id,name,email,celular").order("created_at");
-      return (data ?? []).map((p) => ({ id: p.id, username: p.name || p.email, email: p.email, celular: p.celular, role: "user", active: true }));
+      const { data: roles } = await supabase.from("user_roles").select("user_id,role").eq("role", "admin");
+      const admins = new Set((roles ?? []).map((r) => r.user_id));
+      return (data ?? []).map((p) => ({ id: p.id, username: p.name || p.email, email: p.email, celular: p.celular, role: admins.has(p.id) ? "admin" : "user", active: true }));
     },
     async load() {
       const out: Record<string, unknown> = {};
