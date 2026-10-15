@@ -166,6 +166,7 @@ body{font-family:Inter,sans-serif;background:#0f172a;color:#f8fafc;margin:0}
 <a class="nv" id="n-budgets" onclick="go('budgets')"><i class="fa-solid fa-bullseye"></i> Orçamentos</a>
 <a class="nv" id="n-recurring" onclick="go('recurring')"><i class="fa-solid fa-arrows-rotate"></i> Recorrentes</a>
 <a class="nv" id="n-reports" onclick="go('reports')"><i class="fa-solid fa-chart-simple"></i> Relatórios</a>
+<a class="nv" id="n-historico" onclick="go('historico')"><i class="fa-solid fa-clock-rotate-left"></i> Histórico de Gastos</a>
 <a class="nv" id="n-planning" onclick="go('planning')"><i class="fa-solid fa-clock"></i> Planejamento</a>
 <div class="sep"></div>
 <a class="nv" onclick="expCSV()"><i class="fa-solid fa-file-export"></i> Exportar CSV</a>
@@ -272,6 +273,18 @@ body{font-family:Inter,sans-serif;background:#0f172a;color:#f8fafc;margin:0}
 </div>
 </div>
 
+<div id="s-historico" class="sec space-y-6">
+<header style="padding-bottom:1rem;border-bottom:1px solid #1e293b"><h2 style="font-size:1.5rem;font-weight:700;color:#fff;margin:0">Histórico de Gastos</h2></header>
+<div style="display:flex;flex-wrap:wrap;gap:.75rem">
+<input type="month" id="hgM" onchange="renderHist()" style="background:#1e293b;border:1px solid #334155;color:#fff;border-radius:.5rem;padding:.5rem .75rem;font-size:.85rem">
+<select id="hgP" onchange="renderHist()" style="background:#1e293b;border:1px solid #334155;color:#fff;border-radius:.5rem;padding:.5rem .75rem;font-size:.85rem"><option value="">Todos</option><option value="credito">Crédito</option><option value="debito">Débito</option></select>
+<select id="hgC" onchange="renderHist()" style="background:#1e293b;border:1px solid #334155;color:#fff;border-radius:.5rem;padding:.5rem .75rem;font-size:.85rem"></select>
+<select id="hgF" onchange="renderHist()" style="background:#1e293b;border:1px solid #334155;color:#fff;border-radius:.5rem;padding:.5rem .75rem;font-size:.85rem"></select>
+</div>
+<div id="hgSum" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1rem"></div>
+<div style="background:#0f172a;border:1px solid #1e293b;border-radius:1rem;padding:1.5rem;overflow-x:auto"><h4 style="font-weight:700;color:#fff;margin:0 0 1rem">Transações do mês</h4><div id="hgList"></div></div>
+<div style="background:#0f172a;border:1px solid #1e293b;border-radius:1rem;padding:1.5rem;overflow-x:auto"><h4 style="font-weight:700;color:#fff;margin:0 0 1rem">Relatório de Gastos por Mês</h4><div id="hgRep"></div></div>
+</div>
 <div id="s-planning" class="sec space-y-6">
 <header style="padding-bottom:1rem;border-bottom:1px solid #1e293b"><h2 style="font-size:1.5rem;font-weight:700;color:#fff;margin:0">Planejamento</h2></header>
 <div style="background:#0f172a;border:1px solid #1e293b;border-radius:1rem;padding:1.5rem">
@@ -1232,6 +1245,63 @@ function adminResetPass(){
   u.password=p;saveUsers(users);closeM('mRp');alert(`✅ Senha de "${u.username}" redefinida!`);
 }
 
+
+// ============ HISTÓRICO DE GASTOS ============
+function hgMk(y,m){return y+'-'+String(m).padStart(2,'0')}
+// Lançamentos por mês: crédito parcelado é distribuído em N parcelas a partir do mês da compra
+function hgEntries(){
+  const out=[];
+  myTxs().forEach(t=>{
+    const p=(t.date||'').split('-');if(p.length<2)return;
+    const y=+p[0],m=+p[1];
+    const cred=t.type==='despesa'&&t.paymentMethod==='credito';
+    const n=cred?Math.max(1,parseInt(t.installments)||1):1;
+    for(let i=0;i<n;i++){
+      const mm=(m-1+i)%12+1,yy=y+Math.floor((m-1+i)/12);
+      let v=t.amount;
+      if(cred){const base=Math.round(t.amount/n*100)/100;v=i===n-1?Math.round((t.amount-base*(n-1))*100)/100:base}
+      out.push({t,key:hgMk(yy,mm),value:v,idx:i+1,n,cred});
+    }
+  });
+  return out;
+}
+function hgFund(t){const c=cards.find(x=>x.id===t.cardId);return c?c.name:''}
+function hgFiltered(){
+  const P=document.getElementById('hgP').value,C=document.getElementById('hgC').value,F=document.getElementById('hgF').value;
+  return hgEntries().filter(e=>{
+    if(C&&e.t.category!==C)return false;
+    if(F&&String(e.t.cardId)!==F)return false;
+    if(P==='credito'&&!(e.t.type==='despesa'&&e.cred))return false;
+    if(P==='debito'&&!(e.t.type==='despesa'&&!e.cred))return false;
+    return true;
+  });
+}
+function hgTot(list){
+  let deb=0,cre=0,rec=0;
+  list.forEach(e=>{if(e.t.type==='receita')rec+=e.value;else if(e.t.type==='despesa'){if(e.cred)cre+=e.value;else deb+=e.value}});
+  deb=Math.round(deb*100)/100;cre=Math.round(cre*100)/100;rec=Math.round(rec*100)/100;
+  const g=Math.round((deb+cre)*100)/100;return{deb,cre,g,rec,saldo:Math.round((rec-g)*100)/100};
+}
+function hgSel(k){document.getElementById('hgM').value=k;renderHist();document.getElementById('s-historico').scrollIntoView({behavior:'smooth'})}
+function renderHist(){
+  const mE=document.getElementById('hgM');if(!mE)return;
+  if(!mE.value){const d=new Date();mE.value=hgMk(d.getFullYear(),d.getMonth()+1)}
+  const cE=document.getElementById('hgC'),fE=document.getElementById('hgF');
+  const cv=cE.value,fv=fE.value;
+  const catsU=[...new Set(myTxs().map(t=>t.category).filter(Boolean))].sort();
+  cE.innerHTML='<option value="">Todas as categorias</option>'+catsU.map(c=>`<option value="${c}">${c}</option>`).join('');cE.value=catsU.includes(cv)?cv:'';
+  fE.innerHTML='<option value="">Todas as contas/fundos</option>'+cards.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');fE.value=cards.some(c=>String(c.id)===fv)?fv:'';
+  const all=hgFiltered(),key=mE.value,month=all.filter(e=>e.key===key),T=hgTot(month);
+  const box=(l,v,c)=>`<div style="background:#0f172a;border:1px solid #1e293b;border-radius:1rem;padding:1rem"><div style="font-size:.75rem;color:#94a3b8">${l}</div><div style="font-size:1.15rem;font-weight:700;color:${c}">${fmt(v)}</div></div>`;
+  document.getElementById('hgSum').innerHTML=box('Gastos no Débito',T.deb,'#fb7185')+box('Gastos no Crédito (parcelas do mês)',T.cre,'#fb7185')+box('Total Geral de Gastos',T.g,'#f87171')+box('Total de Receitas',T.rec,'#34d399')+box('Saldo do Mês',T.saldo,T.saldo>=0?'#34d399':'#f87171');
+  const th=h=>`<th style="padding:.5rem .75rem;text-align:left;font-size:.7rem;color:#94a3b8;text-transform:uppercase;white-space:nowrap">${h}</th>`;
+  const td=(v,st='')=>`<td style="padding:.5rem .75rem;font-size:.8rem;color:#cbd5e1;white-space:nowrap;${st}">${v}</td>`;
+  month.sort((a,b)=>(b.t.date||'').localeCompare(a.t.date||''));
+  document.getElementById('hgList').innerHTML=month.length?`<table style="width:100%;border-collapse:collapse"><thead><tr>${['Data','Descrição','Categoria','Forma de pagamento','Valor total','Parcelas','Valor da parcela','Conta/Fundo','Tipo'].map(th).join('')}</tr></thead><tbody>${month.map(e=>{const t=e.t;const r=t.type==='receita';return `<tr style="border-top:1px solid #1e293b">${td(new Date(t.date+'T00:00:00').toLocaleDateString('pt-BR'))}${td(t.description||'')}${td(t.category||'')}${td(payLabel(t.paymentMethod||'pix'))}${td(fmt(t.amount))}${td(e.cred?e.idx+'/'+e.n:'-')}${td(e.cred?fmt(e.value):'-')}${td(hgFund(t)||'-')}${td(r?'Receita':'Gasto',r?'color:#34d399':'color:#fb7185')}</tr>`}).join('')}</tbody></table>`:'<p style="color:#64748b;font-size:.85rem;margin:0">Nenhuma transação neste mês.</p>';
+  const keys=[...new Set(all.map(e=>e.key))].sort();let acc=0;const rows=keys.map(k=>{const t=hgTot(all.filter(e=>e.key===k));acc=Math.round((acc+t.saldo)*100)/100;return{k,t,acc}}).reverse();
+  document.getElementById('hgRep').innerHTML=rows.length?`<table style="width:100%;border-collapse:collapse"><thead><tr>${['Mês/Ano','Débito','Crédito (parcelas)','Total de Gastos','Receitas','Saldo do Mês','Saldo Acumulado'].map(th).join('')}</tr></thead><tbody>${rows.map(r=>{const [y,m]=r.k.split('-');const on=r.k===key;return `<tr onclick="hgSel('${r.k}')" style="border-top:1px solid #1e293b;cursor:pointer;${on?'background:rgba(52,211,153,.08)':''}">${td(m+'/'+y,'font-weight:600')}${td(fmt(r.t.deb))}${td(fmt(r.t.cre))}${td(fmt(r.t.g))}${td(fmt(r.t.rec),'color:#34d399')}${td(fmt(r.t.saldo),r.t.saldo>=0?'color:#34d399':'color:#f87171')}${td(fmt(r.acc),r.acc>=0?'color:#34d399':'color:#f87171')}</tr>`}).join('')}</tbody></table>`:'<p style="color:#64748b;font-size:.85rem;margin:0">Nenhum mês cadastrado.</p>';
+}
+
 // ============ NAV ============
 function go(sec){
   document.querySelectorAll('.sec').forEach(x=>x.classList.remove('on'));
@@ -1241,6 +1311,7 @@ function go(sec){
   const nl=document.getElementById('n-'+sec);
   if(nl)nl.classList.add('on');
   if(sec==='profile')renderProfile();
+  if(sec==='historico')renderHist();
   if(sec==='admin'&&isAdm())renderUsers();
   if(window.innerWidth<768)closeSB();
   if(sec==='dashboard')setTimeout(()=>{[c1,c2,c3,c4].forEach(x=>x&&x.resize())},50);
