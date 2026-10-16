@@ -522,10 +522,73 @@ let cloudUsers=[];
 function getUsers(){return me&&isAdm()?cloudUsers:(me?[me]:[])}
 function saveUsers(u){sSet('hg_users',JSON.stringify(u))}
 let me=null;
-function getMe(){const d=sGet('hg_me');if(d){try{return JSON.parse(d)}catch(e){}}return null}
-function setMe(u){if(u)sSet('hg_me',JSON.stringify(u));else sRem('hg_me');me=u}
 function isAdm(){return me&&me.role==='admin'}
 function resetAll(){if(!confirm('Limpar os dados temporários deste navegador? Seus dados na nuvem continuam salvos.'))return;sClr();location.reload()}
+
+// ============ BIOMETRIA (WebAuthn) ============
+const BIO_KEY='hg_bio';
+function bioGet(){try{return JSON.parse(localStorage.getItem(BIO_KEY)||'null')}catch(e){return null}}
+function bioSet(v){if(v)localStorage.setItem(BIO_KEY,JSON.stringify(v));else localStorage.removeItem(BIO_KEY)}
+async function bioSupported(){
+  try{return !!(window.PublicKeyCredential&&navigator.credentials)&&await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()}catch(e){return false}
+}
+function b64(buf){let s='';new Uint8Array(buf).forEach(c=>s+=String.fromCharCode(c));return btoa(s)}
+function unb64(s){return Uint8Array.from(atob(s),c=>c.charCodeAt(0)).buffer}
+async function bioRegister(u){
+  const cred=await navigator.credentials.create({publicKey:{
+    challenge:crypto.getRandomValues(new Uint8Array(32)),
+    rp:{name:'HiperGestão'},
+    user:{id:crypto.getRandomValues(new Uint8Array(16)),name:u.email,displayName:u.username||u.email},
+    pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+    authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required'},
+    timeout:60000
+  }});
+  if(!cred)throw new Error('Registro cancelado');
+  bioSet({email:u.email,credId:b64(cred.rawId)});
+}
+async function bioVerify(){
+  const b=bioGet();if(!b)throw new Error('Biometria não ativada');
+  const a=await navigator.credentials.get({publicKey:{
+    challenge:crypto.getRandomValues(new Uint8Array(32)),
+    allowCredentials:[{type:'public-key',id:unb64(b.credId)}],
+    userVerification:'required',timeout:60000
+  }});
+  if(!a)throw new Error('Biometria não reconhecida');
+}
+async function refreshBioBtn(){
+  const btn=document.getElementById('btnBio');if(!btn)return;
+  const b=bioGet();
+  btn.style.display=(b&&await bioSupported())?'':'none';
+}
+async function doBioLogin(){
+  document.getElementById('le').style.display='none';
+  const u=await cloud.getUser();
+  if(!u)return showErr('le','Entre uma vez com e-mail e senha para usar a biometria.');
+  try{await bioVerify();await startSession()}catch(e){showErr('le','❌ Biometria cancelada ou não reconhecida. Use e-mail e senha.')}
+}
+async function maybeOfferBio(){
+  if(!me)return;
+  const b=bioGet();
+  if(b&&b.email===me.email)return;
+  if(!await bioSupported())return;
+  if(confirm('Deseja ativar o login por biometria (digital ou reconhecimento facial) neste dispositivo?')){
+    try{await bioRegister(me);alert('✅ Biometria ativada! Na próxima abertura, use sua digital ou rosto para entrar.')}catch(e){}
+  }
+  refreshBioBtn();
+}
+async function toggleBio(){
+  const b=bioGet();
+  if(b&&me&&b.email===me.email){bioSet(null);upBioCfg();refreshBioBtn();return}
+  if(!await bioSupported()){document.getElementById('bioStatus').textContent='Este dispositivo não suporta biometria.';return}
+  try{await bioRegister(me)}catch(e){document.getElementById('bioStatus').textContent='Não foi possível ativar: '+(e.message||e);return}
+  upBioCfg();refreshBioBtn();
+}
+function upBioCfg(){
+  const b=bioGet(),on=!!(b&&me&&b.email===me.email);
+  const btn=document.getElementById('btnBioCfg'),st=document.getElementById('bioStatus');
+  if(btn)btn.textContent=on?'Desativar biometria':'Ativar biometria';
+  if(st)st.textContent=on?'Biometria ativada neste dispositivo.':'Use sua digital ou reconhecimento facial para entrar mais rápido neste dispositivo.';
+}
 
 // ============ LOGIN (AGORA COM E-MAIL) ============
 function showPanel(p){
