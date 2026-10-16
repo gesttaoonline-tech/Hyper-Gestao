@@ -100,6 +100,7 @@ body{font-family:Inter,sans-serif;background:#0f172a;color:#f8fafc;margin:0}
 <div class="ig"><label>E-mail</label><input type="email" id="lu" placeholder="seu@email.com" autocomplete="email"></div>
 <div class="ig"><label>Senha</label><input type="password" id="lp" placeholder="Digite sua senha" onkeypress="if(event.key==='Enter')doLogin()"></div>
 <button class="bp" onclick="doLogin()"><i class="fa-solid fa-right-to-bracket" style="margin-right:.5rem"></i>Entrar</button>
+<button class="bp" id="btnBio" onclick="doBioLogin()" style="display:none;background:#1e293b;color:#34d399;border:1px solid rgba(52,211,153,.4);margin-top:.5rem"><i class="fa-solid fa-fingerprint" style="margin-right:.5rem"></i>Entrar com biometria</button>
 <div id="le" class="er"></div>
 <div class="pl"><a onclick="showPanel('signup')">Criar conta</a><a onclick="showPanel('reset')">Esqueceu a senha?</a></div>
 <div class="rh">Problemas? <a onclick="resetAll()">Resetar dados</a></div>
@@ -308,6 +309,11 @@ body{font-family:Inter,sans-serif;background:#0f172a;color:#f8fafc;margin:0}
 <input type="password" id="pnp" placeholder="Nova senha" style="width:100%;padding:.625rem 1rem;background:#1e293b;border:1px solid #334155;border-radius:.75rem;color:#fff;font-size:.875rem;margin-bottom:.5rem">
 <input type="password" id="pcpf" placeholder="Confirmar" style="width:100%;padding:.625rem 1rem;background:#1e293b;border:1px solid #334155;border-radius:.75rem;color:#fff;font-size:.875rem;margin-bottom:.75rem">
 <button onclick="changePass()" style="width:100%;background:#10b981;color:#0f172a;font-weight:600;padding:.625rem;border-radius:.75rem;border:0;cursor:pointer">Alterar</button>
+</div>
+<div style="background:#0f172a;border:1px solid #1e293b;border-radius:1rem;padding:1.5rem">
+<h3 style="font-weight:700;color:#fff;margin:0 0 .5rem"><i class="fa-solid fa-fingerprint"></i> Biometria</h3>
+<p id="bioStatus" style="color:#94a3b8;font-size:.875rem;margin:0 0 1rem">Use sua digital ou reconhecimento facial para entrar mais rápido neste dispositivo.</p>
+<button id="btnBioCfg" onclick="toggleBio()" style="width:100%;background:#10b981;color:#0f172a;font-weight:600;padding:.625rem;border-radius:.75rem;border:0;cursor:pointer">Ativar biometria</button>
 </div>
 </div>
 <div style="background:#0f172a;border:1px solid rgba(251,113,133,.3);border-radius:1rem;padding:1.5rem">
