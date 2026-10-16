@@ -1516,7 +1516,7 @@ addUser=adminCloudOnly;toggleUser=adminCloudOnly;delUser=adminCloudOnly;openRese
 // ============ START ============
 async function startSession(){
   const u=await cloud.getUser();
-  if(!u){document.getElementById('login').style.display='';return}
+  if(!u){document.getElementById('login').style.display='';refreshBioBtn();return}
   cloudData=await cloud.load();
   me=u;
   if(u.role==='admin'){try{cloudUsers=await cloud.listUsers()}catch(e){cloudUsers=[u]}}
@@ -1524,12 +1524,26 @@ async function startSession(){
   document.getElementById('app').style.display='flex';
   document.getElementById('ub').textContent=u.username;
   document.getElementById('la').style.display=u.role==='admin'?'inline-flex':'none';
+  upBioCfg();
   initApp();
+}
+// Sessão salva + biometria ativada: exigir biometria antes de liberar o acesso.
+async function showBioGate(){
+  document.getElementById('login').style.display='';
+  showPanel('login');
+  refreshBioBtn();
+  try{await bioVerify();await startSession()}
+  catch(e){showErr('le','Toque em "Entrar com biometria" para tentar de novo, ou entre com e-mail e senha.')}
 }
 (async function(){
   for(let i=0;i<100&&!cloud;i++){cloud=window.parent&&window.parent!==window&&window.parent.hgCloud;if(!cloud)await new Promise(r=>setTimeout(r,100))}
   if(!cloud){document.body.innerHTML='<p style="padding:2rem;font-family:sans-serif">Abra o app pela página principal.</p>';return}
-  try{await startSession()}catch(e){console.error(e);document.getElementById('login').style.display='';alert('Erro ao carregar seus dados: '+(e.message||e))}
+  try{
+    const u=await cloud.getUser();
+    const b=bioGet();
+    if(u&&b&&b.email===u.email&&await bioSupported()){await showBioGate();return}
+    await startSession();
+  }catch(e){console.error(e);document.getElementById('login').style.display='';refreshBioBtn();alert('Erro ao carregar seus dados: '+(e.message||e))}
 })();
 </script>
 </body>

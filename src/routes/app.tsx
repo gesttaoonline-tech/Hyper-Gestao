@@ -26,6 +26,11 @@ function AppPage() {
     });
   }
   return (
-    <iframe src="/hipergestao.html" title="HiperGestão" className="fixed inset-0 h-screen w-screen border-0" />
+    <iframe
+      src="/hipergestao.html"
+      title="HiperGestão"
+      allow="publickey-credentials-get 'self'; publickey-credentials-create 'self'"
+      className="fixed inset-0 h-screen w-screen border-0"
+    />
   );
 }
