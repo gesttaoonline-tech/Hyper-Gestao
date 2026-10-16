@@ -100,6 +100,7 @@ body{font-family:Inter,sans-serif;background:#0f172a;color:#f8fafc;margin:0}
 <div class="ig"><label>E-mail</label><input type="email" id="lu" placeholder="seu@email.com" autocomplete="email"></div>
 <div class="ig"><label>Senha</label><input type="password" id="lp" placeholder="Digite sua senha" onkeypress="if(event.key==='Enter')doLogin()"></div>
 <button class="bp" onclick="doLogin()"><i class="fa-solid fa-right-to-bracket" style="margin-right:.5rem"></i>Entrar</button>
+<button class="bp" id="btnBio" onclick="doBioLogin()" style="display:none;background:#1e293b;color:#34d399;border:1px solid rgba(52,211,153,.4);margin-top:.5rem"><i class="fa-solid fa-fingerprint" style="margin-right:.5rem"></i>Entrar com biometria</button>
 <div id="le" class="er"></div>
 <div class="pl"><a onclick="showPanel('signup')">Criar conta</a><a onclick="showPanel('reset')">Esqueceu a senha?</a></div>
 <div class="rh">Problemas? <a onclick="resetAll()">Resetar dados</a></div>
@@ -309,6 +310,11 @@ body{font-family:Inter,sans-serif;background:#0f172a;color:#f8fafc;margin:0}
 <input type="password" id="pcpf" placeholder="Confirmar" style="width:100%;padding:.625rem 1rem;background:#1e293b;border:1px solid #334155;border-radius:.75rem;color:#fff;font-size:.875rem;margin-bottom:.75rem">
 <button onclick="changePass()" style="width:100%;background:#10b981;color:#0f172a;font-weight:600;padding:.625rem;border-radius:.75rem;border:0;cursor:pointer">Alterar</button>
 </div>
+<div style="background:#0f172a;border:1px solid #1e293b;border-radius:1rem;padding:1.5rem">
+<h3 style="font-weight:700;color:#fff;margin:0 0 .5rem"><i class="fa-solid fa-fingerprint"></i> Biometria</h3>
+<p id="bioStatus" style="color:#94a3b8;font-size:.875rem;margin:0 0 1rem">Use sua digital ou reconhecimento facial para entrar mais rápido neste dispositivo.</p>
+<button id="btnBioCfg" onclick="toggleBio()" style="width:100%;background:#10b981;color:#0f172a;font-weight:600;padding:.625rem;border-radius:.75rem;border:0;cursor:pointer">Ativar biometria</button>
+</div>
 </div>
 <div style="background:#0f172a;border:1px solid rgba(251,113,133,.3);border-radius:1rem;padding:1.5rem">
 <h3 style="font-weight:700;color:#fb7185;margin:0 0 .5rem"><i class="fa-solid fa-triangle-exclamation"></i> Zona de Perigo</h3>
@@ -516,10 +522,73 @@ let cloudUsers=[];
 function getUsers(){return me&&isAdm()?cloudUsers:(me?[me]:[])}
 function saveUsers(u){sSet('hg_users',JSON.stringify(u))}
 let me=null;
-function getMe(){const d=sGet('hg_me');if(d){try{return JSON.parse(d)}catch(e){}}return null}
-function setMe(u){if(u)sSet('hg_me',JSON.stringify(u));else sRem('hg_me');me=u}
 function isAdm(){return me&&me.role==='admin'}
 function resetAll(){if(!confirm('Limpar os dados temporários deste navegador? Seus dados na nuvem continuam salvos.'))return;sClr();location.reload()}
+
+// ============ BIOMETRIA (WebAuthn) ============
+const BIO_KEY='hg_bio';
+function bioGet(){try{return JSON.parse(localStorage.getItem(BIO_KEY)||'null')}catch(e){return null}}
+function bioSet(v){if(v)localStorage.setItem(BIO_KEY,JSON.stringify(v));else localStorage.removeItem(BIO_KEY)}
+async function bioSupported(){
+  try{return !!(window.PublicKeyCredential&&navigator.credentials)&&await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()}catch(e){return false}
+}
+function b64(buf){let s='';new Uint8Array(buf).forEach(c=>s+=String.fromCharCode(c));return btoa(s)}
+function unb64(s){return Uint8Array.from(atob(s),c=>c.charCodeAt(0)).buffer}
+async function bioRegister(u){
+  const cred=await navigator.credentials.create({publicKey:{
+    challenge:crypto.getRandomValues(new Uint8Array(32)),
+    rp:{name:'HiperGestão'},
+    user:{id:crypto.getRandomValues(new Uint8Array(16)),name:u.email,displayName:u.username||u.email},
+    pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+    authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required'},
+    timeout:60000
+  }});
+  if(!cred)throw new Error('Registro cancelado');
+  bioSet({email:u.email,credId:b64(cred.rawId)});
+}
+async function bioVerify(){
+  const b=bioGet();if(!b)throw new Error('Biometria não ativada');
+  const a=await navigator.credentials.get({publicKey:{
+    challenge:crypto.getRandomValues(new Uint8Array(32)),
+    allowCredentials:[{type:'public-key',id:unb64(b.credId)}],
+    userVerification:'required',timeout:60000
+  }});
+  if(!a)throw new Error('Biometria não reconhecida');
+}
+async function refreshBioBtn(){
+  const btn=document.getElementById('btnBio');if(!btn)return;
+  const b=bioGet();
+  btn.style.display=(b&&await bioSupported())?'':'none';
+}
+async function doBioLogin(){
+  document.getElementById('le').style.display='none';
+  const u=await cloud.getUser();
+  if(!u)return showErr('le','Entre uma vez com e-mail e senha para usar a biometria.');
+  try{await bioVerify();await startSession()}catch(e){showErr('le','❌ Biometria cancelada ou não reconhecida. Use e-mail e senha.')}
+}
+async function maybeOfferBio(){
+  if(!me)return;
+  const b=bioGet();
+  if(b&&b.email===me.email)return;
+  if(!await bioSupported())return;
+  if(confirm('Deseja ativar o login por biometria (digital ou reconhecimento facial) neste dispositivo?')){
+    try{await bioRegister(me);alert('✅ Biometria ativada! Na próxima abertura, use sua digital ou rosto para entrar.')}catch(e){}
+  }
+  refreshBioBtn();
+}
+async function toggleBio(){
+  const b=bioGet();
+  if(b&&me&&b.email===me.email){bioSet(null);upBioCfg();refreshBioBtn();return}
+  if(!await bioSupported()){document.getElementById('bioStatus').textContent='Este dispositivo não suporta biometria.';return}
+  try{await bioRegister(me)}catch(e){document.getElementById('bioStatus').textContent='Não foi possível ativar: '+(e.message||e);return}
+  upBioCfg();refreshBioBtn();
+}
+function upBioCfg(){
+  const b=bioGet(),on=!!(b&&me&&b.email===me.email);
+  const btn=document.getElementById('btnBioCfg'),st=document.getElementById('bioStatus');
+  if(btn)btn.textContent=on?'Desativar biometria':'Ativar biometria';
+  if(st)st.textContent=on?'Biometria ativada neste dispositivo.':'Use sua digital ou reconhecimento facial para entrar mais rápido neste dispositivo.';
+}
 
 // ============ LOGIN (AGORA COM E-MAIL) ============
 function showPanel(p){
@@ -535,7 +604,7 @@ async function doLogin(){
   document.getElementById('le').style.display='none';
   if(!em||!p)return showErr('le','Preencha e-mail e senha');
   if(!em.includes('@'))return showErr('le','Digite um e-mail válido');
-  try{await cloud.signIn(em,p);await startSession()}catch(err){showErr('le','❌ '+err.message)}
+  try{await cloud.signIn(em,p);await startSession();await maybeOfferBio()}catch(err){showErr('le','❌ '+err.message)}
 }
 async function doSignup(){
   const u=document.getElementById('su').value.trim();
@@ -561,7 +630,7 @@ async function doReset(){
   if(!em||!em.includes('@'))return showErr('re2','Digite um e-mail válido');
   try{await cloud.resetPassword(em);const ok=document.getElementById('rok');ok.textContent='✅ Enviamos um link para você criar uma nova senha.';ok.style.display='block'}catch(err){showErr('re2','❌ '+err.message)}
 }
-function doLogout(){if(confirm('Deseja sair?')){if(cloud)cloud.signOut()}}
+function doLogout(){if(!confirm('Deseja sair?'))return;const b=bioGet();sClr();if(b)bioSet(b);if(cloud)cloud.signOut();else location.reload()}
 
 // ============ DADOS ============
 let txs=[],cards=[],buds=[],recs=[],fats=[],cats={};
@@ -1447,7 +1516,7 @@ addUser=adminCloudOnly;toggleUser=adminCloudOnly;delUser=adminCloudOnly;openRese
 // ============ START ============
 async function startSession(){
   const u=await cloud.getUser();
-  if(!u){document.getElementById('login').style.display='';return}
+  if(!u){document.getElementById('login').style.display='';refreshBioBtn();return}
   cloudData=await cloud.load();
   me=u;
   if(u.role==='admin'){try{cloudUsers=await cloud.listUsers()}catch(e){cloudUsers=[u]}}
@@ -1455,12 +1524,26 @@ async function startSession(){
   document.getElementById('app').style.display='flex';
   document.getElementById('ub').textContent=u.username;
   document.getElementById('la').style.display=u.role==='admin'?'inline-flex':'none';
+  upBioCfg();
   initApp();
+}
+// Sessão salva + biometria ativada: exigir biometria antes de liberar o acesso.
+async function showBioGate(){
+  document.getElementById('login').style.display='';
+  showPanel('login');
+  refreshBioBtn();
+  try{await bioVerify();await startSession()}
+  catch(e){showErr('le','Toque em "Entrar com biometria" para tentar de novo, ou entre com e-mail e senha.')}
 }
 (async function(){
   for(let i=0;i<100&&!cloud;i++){cloud=window.parent&&window.parent!==window&&window.parent.hgCloud;if(!cloud)await new Promise(r=>setTimeout(r,100))}
   if(!cloud){document.body.innerHTML='<p style="padding:2rem;font-family:sans-serif">Abra o app pela página principal.</p>';return}
-  try{await startSession()}catch(e){console.error(e);document.getElementById('login').style.display='';alert('Erro ao carregar seus dados: '+(e.message||e))}
+  try{
+    const u=await cloud.getUser();
+    const b=bioGet();
+    if(u&&b&&b.email===u.email&&await bioSupported()){await showBioGate();return}
+    await startSession();
+  }catch(e){console.error(e);document.getElementById('login').style.display='';refreshBioBtn();alert('Erro ao carregar seus dados: '+(e.message||e))}
 })();
 </script>
 </body>
