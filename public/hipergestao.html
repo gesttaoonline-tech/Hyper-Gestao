@@ -961,22 +961,52 @@ function charts(){
   Chart.defaults.plugins.tooltip.padding=12;
   Chart.defaults.plugins.tooltip.cornerRadius=10;
   const opts={responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#94a3b8'}},tooltip:{callbacks:{label:x=>` ${x.dataset.label||x.label}: ${fmt(x.parsed.y!==undefined?x.parsed.y:x.parsed)}`}}},scales:{x:{grid:{color:'#1e293b'},ticks:{color:'#94a3b8'}},y:{grid:{color:'#1e293b'},ticks:{color:'#94a3b8'}}}};
-  const e1=document.getElementById('c1');if(e1&&!c1)c1=new Chart(e1,{type:'line',data:{labels:[],datasets:[]},options:opts});
+  const opts1={...opts,interaction:{mode:'index',intersect:false},plugins:{...opts.plugins,legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#64748b',font:{size:11}}},y:{grid:{color:'#1e293b',borderDash:[5,5]},ticks:{color:'#64748b',font:{size:11},callback:v=>'R$ '+Number(v).toLocaleString('pt-BR')}}}};
+  const e1=document.getElementById('c1');if(e1&&!c1)c1=new Chart(e1,{type:'line',data:{labels:[],datasets:[
+    {label:'Receitas',data:[],borderColor:'#10b981',backgroundColor:'rgba(16,185,129,.1)',borderWidth:2.5,tension:.3,pointBackgroundColor:'#10b981',pointBorderColor:'#0f172a',pointBorderWidth:2,pointRadius:4,pointHoverRadius:6,fill:true},
+    {label:'Despesas',data:[],borderColor:'#f43f5e',backgroundColor:'rgba(244,63,94,.1)',borderWidth:2.5,tension:.3,pointBackgroundColor:'#f43f5e',pointBorderColor:'#0f172a',pointBorderWidth:2,pointRadius:4,pointHoverRadius:6,fill:true},
+    {label:'Saldo',data:[],borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.1)',borderWidth:2.5,tension:.3,pointBackgroundColor:'#3b82f6',pointBorderColor:'#0f172a',pointBorderWidth:2,pointRadius:4,pointHoverRadius:6,fill:true}
+  ]},options:opts1});
   const e2=document.getElementById('c2');if(e2&&!c2)c2=new Chart(e2,{type:'doughnut',data:{labels:[],datasets:[]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:x=>{const t=x.dataset.data.reduce((a,b)=>a+b,0);const p=t>0?((x.parsed/t)*100).toFixed(1):0;return ` ${x.label}: ${fmt(x.parsed)} (${p}%)`}}}},cutout:'75%'}});
   const e3=document.getElementById('c3');if(e3&&!c3)c3=new Chart(e3,{type:'bar',data:{labels:[],datasets:[]},options:opts});
   const e4=document.getElementById('c4');if(e4&&!c4)c4=new Chart(e4,{type:'line',data:{labels:[],datasets:[]},options:opts});
   updCharts();
 }
+function upEvoAcct(){
+  const s=document.getElementById('evoAcct');
+  if(!s)return;
+  const cur=s.value;
+  s.innerHTML='<option value="all">Conta: Todas ('+cards.length+')</option>';
+  cards.forEach(cd=>{const o=document.createElement('option');o.value=cd.id;o.textContent=cd.name;s.appendChild(o)});
+  if(cur&&Array.from(s.options).some(o=>o.value===cur))s.value=cur;
+}
 function updCharts(){
   if(c1){
-    const ms=[],inc=[],exp=[];
+    const per=parseInt(document.getElementById('evoPer')?.value||'12');
+    const acct=document.getElementById('evoAcct')?.value||'all';
+    const ttl=document.getElementById('evoT');if(ttl)ttl.textContent=`Evolução Financeira (${per} meses)`;
+    const ms=[],inc=[],exp=[],bal=[];
+    let tI=0,tE=0,cum=0;
     const t=new Date();
-    for(let i=11;i>=0;i--){const d=new Date(t.getFullYear(),t.getMonth()-i,1);const s=monthSum(d.getFullYear(),d.getMonth());ms.push(`${mn(d.getMonth())}/${d.getFullYear()}`);inc.push(s.income);exp.push(s.expenses)}
+    for(let i=per-1;i>=0;i--){
+      const d=new Date(t.getFullYear(),t.getMonth()-i,1);
+      const y=d.getFullYear(),mStr=String(d.getMonth()+1).padStart(2,'0');
+      let mi=0,me=0;
+      myTxs().forEach(x=>{
+        const p=(x.date||'').split('-');
+        if(p[0]!=y||p[1]!=mStr)return;
+        if(acct!=='all'&&String(x.cardId)!==String(acct))return;
+        if(x.type==='receita')mi+=x.amount;else me+=x.amount;
+      });
+      tI+=mi;tE+=me;cum+=mi-me;
+      ms.push(`${mn(d.getMonth())}/${y}`);inc.push(mi);exp.push(me);bal.push(cum);
+    }
+    const eI=document.getElementById('evoI'),eE=document.getElementById('evoE'),eB=document.getElementById('evoB');
+    if(eI)eI.textContent=fmt(tI);if(eE)eE.textContent=fmt(tE);if(eB)eB.textContent=fmt(cum);
     c1.data.labels=ms;
-    c1.data.datasets=[
-      {label:'Receitas',data:inc,borderColor:'#10b981',backgroundColor:'rgba(16,185,129,.1)',borderWidth:2,tension:.3,fill:true},
-      {label:'Despesas',data:exp,borderColor:'#f43f5e',backgroundColor:'rgba(244,63,94,.1)',borderWidth:2,tension:.3,fill:true}
-    ];
+    c1.data.datasets[0].data=inc;
+    c1.data.datasets[1].data=exp;
+    c1.data.datasets[2].data=bal;
     c1.update();
   }
   if(c2){
