@@ -375,13 +375,15 @@ body{font-family:Inter,sans-serif;background:#0f172a;color:#f8fafc;margin:0}
 
 <!-- MODAL RESUMO DO MÊS -->
 <div id="mMon" onclick="if(event.target===this)closeM('mMon')" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:50;align-items:center;justify-content:center;padding:1rem">
-<div style="background:#0f172a;border:1px solid #1e293b;border-radius:1rem;width:100%;max-width:380px;padding:1.5rem">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem"><h3 style="font-weight:700;color:#fff;margin:0" id="mMonT">Mês</h3><button onclick="closeM('mMon')" style="background:0;border:0;color:#94a3b8;cursor:pointer;font-size:1.25rem"><i class="fa-solid fa-xmark"></i></button></div>
-<div style="display:flex;flex-direction:column;gap:.75rem;font-size:.9rem">
+<div style="background:#0f172a;border:1px solid #1e293b;border-radius:1rem;width:100%;max-width:680px;max-height:88vh;display:flex;flex-direction:column;padding:1.5rem;box-shadow:0 20px 50px rgba(0,0,0,.5)">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-shrink:0"><h3 style="font-weight:700;color:#fff;margin:0" id="mMonT">Mês</h3><button onclick="closeM('mMon')" aria-label="Fechar" style="background:0;border:0;color:#94a3b8;cursor:pointer;font-size:1.25rem;padding:.25rem"><i class="fa-solid fa-xmark"></i></button></div>
+<div style="display:flex;flex-direction:column;gap:.75rem;font-size:.9rem;flex-shrink:0">
 <div style="display:flex;justify-content:space-between"><span style="color:#94a3b8">Receitas</span><span id="mMonI" style="color:#34d399;font-weight:600"></span></div>
 <div style="display:flex;justify-content:space-between"><span style="color:#94a3b8">Gastos</span><span id="mMonE" style="color:#fb7185;font-weight:600"></span></div>
 <div style="display:flex;justify-content:space-between;border-top:1px solid #1e293b;padding-top:.75rem"><span style="color:#cbd5e1;font-weight:600">Saldo</span><span id="mMonB" style="font-weight:700"></span></div>
-</div></div></div>
+</div>
+<div id="mMonTbl" style="margin-top:1rem;overflow-y:auto;overflow-x:auto;min-height:0;border:1px solid #1e293b;border-radius:.75rem;flex:1"></div>
+</div></div>
 
 <!-- MODAL CARTÃO -->
 <div id="mCard" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:50;align-items:center;justify-content:center;padding:1rem">
@@ -771,6 +773,42 @@ function openMonth(m,s){
   document.getElementById('mMonE').textContent=fmt(s.expenses);
   const b=s.income-s.expenses,el=document.getElementById('mMonB');
   el.textContent=fmt(b);el.style.color=b>0?'#34d399':(b<0?'#fb7185':'#cbd5e1');
+  // Tabela detalhada das transações do mês
+  const tb=document.getElementById('mMonTbl');
+  const list=monthTxs(curY,m).slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  if(!list.length){
+    tb.innerHTML='<p style="color:#64748b;font-size:.85rem;text-align:center;padding:1.25rem;margin:0">Nenhuma transação neste mês.</p>';
+  }else{
+    const th=t=>`<th style="padding:.625rem .75rem;text-align:left;color:#94a3b8;font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;border-bottom:1px solid #334155">${t}</th>`;
+    const td=(v,st)=>`<td style="padding:.625rem .75rem;font-size:.8rem;border-bottom:1px solid #1e293b;${st||''}">${v}</td>`;
+    const rows=list.map(t=>{
+      const r=t.type==='receita';
+      const card=cards.find(c=>c.id===t.cardId);
+      const d=new Date((t.date||'')+'T00:00:00');
+      const dTxt=isNaN(d)?(t.date||'—'):d.toLocaleDateString('pt-BR');
+      return `<tr style="transition:background .15s" onmouseover="this.style.background='rgba(30,41,59,.6)'" onmouseout="this.style.background=''">
+        ${td(dTxt,'color:#94a3b8;white-space:nowrap')}
+        ${td(t.description||'—','color:#fff;font-weight:500;min-width:8rem')}
+        ${td(t.category||'—','color:#cbd5e1;white-space:nowrap')}
+        ${td(card?card.name:'—','color:#94a3b8;white-space:nowrap')}
+        ${td(`<span style="padding:.15rem .5rem;background:rgba(51,65,85,.5);color:#cbd5e1;font-size:.7rem;border-radius:.375rem;white-space:nowrap">${payLabel(t.paymentMethod||'pix')}</span>`)}
+        ${td((r?'+ ':'− ')+fmt(t.amount),`color:${r?'#34d399':'#fb7185'};font-weight:600;white-space:nowrap;text-align:right`)}
+      </tr>`;
+    }).join('');
+    const net=list.reduce((ac,x)=>ac+(x.type==='receita'?x.amount:-x.amount),0);
+    const inc=list.filter(x=>x.type==='receita').reduce((a,x)=>a+x.amount,0);
+    const exp=list.filter(x=>x.type!=='receita').reduce((a,x)=>a+x.amount,0);
+    const netC=net>0?'#34d399':(net<0?'#fb7185':'#cbd5e1');
+    tb.innerHTML=`<table style="width:100%;border-collapse:collapse;min-width:560px">
+      <thead><tr>${th('Data')}${th('Descrição')}${th('Categoria')}${th('Cartão/Conta')}${th('Pagamento')}${th('Valor')}</tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr style="border-top:2px solid #334155;background:rgba(30,41,59,.5)">
+        <td colspan="5" style="padding:.75rem;font-weight:700;color:#fff;font-size:.8rem;position:sticky;left:0">TOTAL DO PERÍODO<span style="color:#64748b;font-weight:400"> · ${list.length} lançamento${list.length>1?'s':''}</span></td>
+        <td style="padding:.75rem;font-weight:700;font-size:.85rem;text-align:right;white-space:nowrap;color:${netC}">${fmt(net)}</td>
+      </tr></tfoot>
+    </table>
+    <p style="color:#64748b;font-size:.7rem;margin:0;padding:.5rem .75rem;border-top:1px solid #1e293b;position:sticky;left:0">Entradas: <span style="color:#34d399">${fmt(inc)}</span> · Saídas: <span style="color:#fb7185">${fmt(exp)}</span></p>`;
+  }
   document.getElementById('mMon').style.display='flex';
 }
 function changeYear(d){curY+=d;selM=null;renderMonths();charts()}
