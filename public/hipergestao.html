@@ -733,12 +733,18 @@ function renderCards(){
   const emp=document.getElementById('cardsEmpty');
   if(!c)return;
   c.innerHTML='';
-  if(cards.length===0){emp.style.display='block';return}
+  if(cards.length===0){emp.style.display='block';upEvoAcct();return}
   emp.style.display='none';
-  const icons={'Cartão de Crédito':'fa-credit-card','Conta Corrente':'fa-building-columns','Conta Poupança':'fa-piggy-bank','Investimento':'fa-chart-line','Carteira':'fa-wallet'};
+  const styles={
+    'Cartão de Crédito':{cls:'cd-credito',icon:'fa-credit-card',ic:'#c084fc',bdg:'background:rgba(168,85,247,.2);color:#d8b4fe'},
+    'Conta Corrente':{cls:'cd-corrente',icon:'fa-building-columns',ic:'#60a5fa',bdg:'background:rgba(59,130,246,.2);color:#93c5fd'},
+    'Conta Poupança':{cls:'cd-poupanca',icon:'fa-piggy-bank',ic:'#34d399',bdg:'background:rgba(16,185,129,.2);color:#6ee7b7'},
+    'Investimento':{cls:'cd-invest',icon:'fa-chart-line',ic:'#fbbf24',bdg:'background:rgba(245,158,11,.2);color:#fcd34d'},
+    'Carteira':{cls:'cd-carteira',icon:'fa-wallet',ic:'#94a3b8',bdg:'background:rgba(148,163,184,.2);color:#cbd5e1'}
+  };
   cards.forEach(card=>{
+    const st=styles[card.type]||styles['Carteira'];
     const isC=card.type==='Cartão de Crédito';
-    const icon=icons[card.type]||'fa-credit-card';
     const bal=cardBal(card.id);
     const init=card.limit||0;
     const debt=isC?cardDebt(card.id):0;
@@ -746,10 +752,10 @@ function renderCards(){
     const pct=isC&&card.limit>0?(debt/card.limit)*100:0;
     const pc=pct>80?'hi':(pct>50?'med':'low');
     const div=document.createElement('div');
-    div.className='cd';
+    div.className='cd '+st.cls;
     let h=`
       <div class="ch">
-        <div class="ci"><i class="fa-regular ${icon}"></i></div>
+        <div class="ci" style="color:${st.ic};background:rgba(0,0,0,.25)"><i class="fa-solid ${st.icon}"></i></div>
         <div class="ct"><h4>${card.name}</h4><span>${card.type}</span></div>
         <div class="ca">
           ${isC?`<button class="pb" onclick="event.stopPropagation();openFat(${card.id})" title="Pagar fatura"><i class="fa-solid fa-money-bill-wave"></i></button>`:''}
@@ -761,16 +767,19 @@ function renderCards(){
       h+=`
         <div class="cr"><span class="l">Limite</span><span class="v">${fmt(init)}</span></div>
         <div class="cr"><span class="l">Disponível</span><span class="v p">${fmt(bal)}</span></div>
-        <div class="cr"><span class="l">Fatura do mês</span><span class="v i">${fmt(inv)}</span></div>
-        <div class="cp"><div class="f ${pc}" style="width:${Math.min(pct,100)}%"></div></div>`;
+        <div class="cr"><span class="l">Usado</span><span class="v" style="color:#fbbf24">${fmt(debt)}</span></div>
+        <div class="cp"><div class="f ${pc}" style="width:${Math.min(pct,100)}%"></div></div>
+        <div class="cr" style="margin-top:.5rem"><span class="l">Fatura do mês</span><span class="v i">${fmt(inv)}</span></div>`;
     }else{
       h+=`
         <div class="cr"><span class="l">Saldo inicial</span><span class="v">${fmt(init)}</span></div>
         <div class="cr"><span class="l">Saldo atual</span><span class="v ${bal>=0?'p':'n'}">${fmt(bal)}</span></div>`;
     }
+    h+=`<div><span class="bdg" style="${st.bdg}">${card.type}</span></div>`;
     div.innerHTML=h;
     c.appendChild(div);
   });
+  upEvoAcct();
 }
 
 // ============ RENDER MESES ============
