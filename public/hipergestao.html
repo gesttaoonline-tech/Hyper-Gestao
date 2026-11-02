@@ -228,7 +228,18 @@ body{font-family:Inter,sans-serif;background:#0f172a;color:#f8fafc;margin:0}
 </section>
 <section style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.5rem">
 <div style="background:#0f172a;border:1px solid #1e293b;border-radius:1rem;padding:1.25rem">
-<h4 style="font-weight:700;color:#fff;margin:0 0 1rem">Evolução Financeira</h4>
+<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem;flex-wrap:wrap;margin-bottom:1rem">
+<h4 id="evoT" style="font-weight:700;color:#fff;margin:0">Evolução Financeira (12 meses)</h4>
+<div style="display:flex;gap:.5rem;flex-wrap:wrap">
+<select id="evoAcct" onchange="updCharts()" style="font-size:.75rem;background:#1e293b;border:1px solid #334155;border-radius:.5rem;padding:.375rem .75rem;color:#cbd5e1;cursor:pointer;outline:none"><option value="all">Conta: Todas</option></select>
+<select id="evoPer" onchange="updCharts()" style="font-size:.75rem;background:#1e293b;border:1px solid #334155;border-radius:.5rem;padding:.375rem .75rem;color:#cbd5e1;cursor:pointer;outline:none"><option value="3">3 meses</option><option value="6">6 meses</option><option value="12" selected>12 meses</option></select>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:1rem;background:rgba(2,6,23,.4);padding:.75rem;border-radius:.75rem;border:1px solid rgba(30,41,59,.6)">
+<div style="text-align:center"><div style="font-size:.65rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;border:2px solid #10b981;margin-right:.3rem"></span>Receitas</div><div id="evoI" style="font-size:.85rem;font-weight:700;color:#34d399">R$ 0,00</div></div>
+<div style="text-align:center"><div style="font-size:.65rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;border:2px solid #f43f5e;margin-right:.3rem"></span>Despesas</div><div id="evoE" style="font-size:.85rem;font-weight:700;color:#fb7185">R$ 0,00</div></div>
+<div style="text-align:center"><div style="font-size:.65rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;border:2px solid #3b82f6;margin-right:.3rem"></span>Saldo</div><div id="evoB" style="font-size:.85rem;font-weight:700;color:#60a5fa">R$ 0,00</div></div>
+</div>
 <div style="min-height:260px;position:relative"><canvas id="c1"></canvas></div>
 </div>
 <div style="background:#0f172a;border:1px solid #1e293b;border-radius:1rem;padding:1.25rem">
